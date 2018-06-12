@@ -46,41 +46,41 @@ func inetAton(ip string) int64 {
 	return sum
 }
 
-func NewQQwry(file string) (qqwry *QQwry) {
-	qqwry = &QQwry{}
+func NewQQwry(file string) (q *QQwry) {
+	q = &QQwry{}
 	var err error
-	qqwry.Data, err = ioutil.ReadFile(file)
+	q.Data, err = ioutil.ReadFile(file)
 	if err != nil {
 		panic(err)
 	}
-	if len(qqwry.Data) < 8 {
+	if len(q.Data) < 8 {
 		panic("file size is too small")
 	}
 
-	qqwry.IndexBegin = int4(qqwry.Data, 0)
-	qqwry.IndexEnd = int4(qqwry.Data, 4)
-	if qqwry.IndexBegin > qqwry.IndexEnd || (qqwry.IndexEnd - qqwry.IndexBegin) % 7 != 0 || qqwry.IndexEnd + 7 > len(qqwry.Data) {
+	q.IndexBegin = int4(q.Data, 0)
+	q.IndexEnd = int4(q.Data, 4)
+	if q.IndexBegin > q.IndexEnd || (q.IndexEnd - q.IndexBegin) % 7 != 0 || q.IndexEnd + 7 > len(q.Data) {
 		panic("index error")
 	}
 
-	qqwry.IndexCount = (qqwry.IndexEnd - qqwry.IndexBegin) / 7 + 1
+	q.IndexCount = (q.IndexEnd - q.IndexBegin) / 7 + 1
 
-	for i:=0;i<qqwry.IndexCount;i++ {
-		ipBegin := int4(qqwry.Data, qqwry.IndexBegin + i * 7)
-		offset := int3(qqwry.Data, qqwry.IndexBegin + i * 7 + 4)
-		ipEnd := int4(qqwry.Data, offset)
-		qqwry.Idx1 = append(qqwry.Idx1, ipBegin)
-		qqwry.Idx2 = append(qqwry.Idx2, ipEnd)
-		qqwry.Idxo = append(qqwry.Idxo, offset + 4)
+	for i:=0;i<q.IndexCount;i++ {
+		ipBegin := int4(q.Data, q.IndexBegin + i * 7)
+		offset := int3(q.Data, q.IndexBegin + i * 7 + 4)
+		ipEnd := int4(q.Data, offset)
+		q.Idx1 = append(q.Idx1, ipBegin)
+		q.Idx2 = append(q.Idx2, ipEnd)
+		q.Idxo = append(q.Idxo, offset + 4)
 	}
 
-	fmt.Printf("%s %d bytes, %d segments. with index.", file, len(qqwry.Data), len(qqwry.Idx1))
+	fmt.Printf("%s %d bytes, %d segments. with index.", file, len(q.Data), len(q.Idx1))
 
-	return qqwry
+	return q
 }
 
-func (qqwry *QQwry) Find(ip string) (country string, province string) {
-	return qqwry.indexSearch(inetAton(ip))
+func (q *QQwry) Find(ip string) (country string, province string) {
+	return q.indexSearch(inetAton(ip))
 }
 
 //func (qqwry *QQwry)rawFind(ip int64) (country string, province string) {
@@ -111,39 +111,39 @@ func (qqwry *QQwry) Find(ip string) (country string, province string) {
 //	}
 //}
 
-func (qqwry *QQwry)indexSearch(ip int64) (country string, province string) {
-	posi := sort.Search(len(qqwry.Idx1), func(i int) bool { return int64(qqwry.Idx1[i]) > ip }) - 1
-	if posi >= 0 && ip >= int64(qqwry.Idx1[posi]) && ip <= int64(qqwry.Idx2[posi]) {
-		return qqwry.getAddr(qqwry.Idxo[posi])
+func (q *QQwry)indexSearch(ip int64) (country string, province string) {
+	posi := sort.Search(len(q.Idx1), func(i int) bool { return int64(q.Idx1[i]) > ip }) - 1
+	if posi >= 0 && ip >= int64(q.Idx1[posi]) && ip <= int64(q.Idx2[posi]) {
+		return q.getAddr(q.Idxo[posi])
 	} else {
 		return "", ""
 	}
 }
 
-func (qqwry *QQwry)getAddr(offset int) (country string, province string) {
+func (q *QQwry)getAddr(offset int) (country string, province string) {
 	// mode 0x01, full jump
-	mode := qqwry.Data[offset]
+	mode := q.Data[offset]
 	if mode == 1 {
-		offset = int3(qqwry.Data, offset+1)
-		mode = qqwry.Data[offset]
+		offset = int3(q.Data, offset+1)
+		mode = q.Data[offset]
 	}
 
 	var c []byte
 	// country
 	if mode == 2 {
-		off1 := int3(qqwry.Data, offset+1)
-		c = qqwry.Data[off1:(bytes.IndexByte(qqwry.Data[off1:], 0) + off1)]
+		off1 := int3(q.Data, offset+1)
+		c = q.Data[off1:(bytes.IndexByte(q.Data[off1:], 0) + off1)]
 		offset += 4
 	} else {
-		c = qqwry.Data[offset:(bytes.IndexByte(qqwry.Data[offset:], 0) + offset)]
+		c = q.Data[offset:(bytes.IndexByte(q.Data[offset:], 0) + offset)]
 		offset += len(c) + 1
 	}
 
 	// province
-	if qqwry.Data[offset] == 2 {
-		offset = int3(qqwry.Data, offset+1)
+	if q.Data[offset] == 2 {
+		offset = int3(q.Data, offset+1)
 	}
-	p := qqwry.Data[offset:(bytes.IndexByte(qqwry.Data[offset:], 0) + offset)]
+	p := q.Data[offset:(bytes.IndexByte(q.Data[offset:], 0) + offset)]
 
 	gbk := mahonia.NewDecoder("gbk")
 	country = gbk.ConvertString(string(c))
