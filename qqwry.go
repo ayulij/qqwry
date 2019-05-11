@@ -74,7 +74,7 @@ func NewQQwry(file string) (q *QQwry) {
 		q.Idxo = append(q.Idxo, offset + 4)
 	}
 
-	fmt.Printf("%s %d bytes, %d segments. with index.", file, len(q.Data), len(q.Idx1))
+	fmt.Printf("%s %d bytes, %d segments. with index.\n", file, len(q.Data), len(q.Idx1))
 
 	return q
 }
